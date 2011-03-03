@@ -136,7 +136,7 @@ FIN;
 
   public static function CacheAddress($address,$pos) {
     if (!$address || !$pos) return FALSE;
-    $res = sql_query("INSERT INTO tabledef_GeoCache (request,response) VALUES ('".mysql_real_escape_string($address)."','".mysql_real_escape_string(json_encode($pos))."') ON DUPLICATE KEY UPDATE");
+    $res = sql_query("INSERT INTO tabledef_GeoCache (request,response) VALUES ('".mysql_real_escape_string($address)."','".mysql_real_escape_string(json_encode($pos))."') ON DUPLICATE KEY UPDATE response = '".mysql_real_escape_string($address)."'");
 //    if (mysql_num_rows($res))
 //    if (!array_key_exists('gmaps_posCache',$_SESSION)) $_SESSION['gmaps_posCache'] = array();
 //    if (array_key_exists($address,$_SESSION['gmaps_posCache'])) return FALSE;
