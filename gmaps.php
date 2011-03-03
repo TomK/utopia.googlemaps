@@ -148,7 +148,7 @@ FIN;
     $res = sql_query("SELECT * FROM tabledef_GeoCache WHERE `request` = '".mysql_real_escape_string($address)."' AND SUBDATE(NOW(), INTERVAL 3 DAY) < `update`");
     if (!mysql_num_rows($res)) return FALSE;
     $row = mysql_fetch_assoc($res);
-    return json_decode($row['response']);
+    return json_decode($row['response'],true);
 //    if (!array_key_exists('gmaps_posCache',$_SESSION)) $_SESSION['gmaps_posCache'] = array();
 //    mail('tom.kay@utopiasystems.co.uk','Map Cache',"Requesting $address");
 //    if (array_key_exists($address,$_SESSION['gmaps_posCache'])) return $_SESSION['gmaps_posCache'][$address];
