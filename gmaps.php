@@ -1,5 +1,19 @@
 <?php
 
+class tabledef_GeoCache extends uTableDef {
+        public function SetupFields() {
+//                $this->AddField('geocache_id',ftNUMBER);
+                $this->AddField('update',ftTIMESTAMP);
+		$this->SetFieldProperty('update','extra','ON UPDATE CURRENT_TIMESTAMP');
+                $this->SetFieldProperty('update','default','current_timestamp');
+		$this->AddField('request',ftVARCHAR,500);
+                $this->AddField('response',ftLONGTEXT);
+
+                $this->SetPrimaryKey('request');
+//		$this->SetIndexField('request');
+        }
+}
+
 utopia::AddTemplateParser('gmapInit','GoogleMaps::GetMapInit','');
 class GoogleMaps {
 	private static $scriptDrawn = FALSE;
@@ -121,17 +135,24 @@ FIN;
 	}
 
   public static function CacheAddress($address,$pos) {
-    if (!array_key_exists('gmaps_posCache',$_SESSION)) $_SESSION['gmaps_posCache'] = array();
-    if (array_key_exists($address,$_SESSION['gmaps_posCache'])) return FALSE;
-    //mail('tom.kay@utopiasystems.co.uk','Map Cache2',"Caching $address as:\n".print_r($pos,true));
-    $_SESSION['gmaps_posCache'][$address] = $pos;
+    if (!$address || !$pos) return FALSE;
+    $res = sql_query("INSERT INTO tabledef_GeoCache (request,response) VALUES ('".mysql_real_escape_string($address)."','".mysql_real_escape_string(json_encode($pos))."') ON DUPLICATE KEY UPDATE");
+//    if (mysql_num_rows($res))
+//    if (!array_key_exists('gmaps_posCache',$_SESSION)) $_SESSION['gmaps_posCache'] = array();
+//    if (array_key_exists($address,$_SESSION['gmaps_posCache'])) return FALSE;
+//    mail('tom.kay@utopiasystems.co.uk','Map Cache2',"Caching $address as:\n".print_r($pos,true));
+//    $_SESSION['gmaps_posCache'][$address] = $pos;
     return TRUE;
   }
   public static function GetCachedAddress($address) {
-    if (!array_key_exists('gmaps_posCache',$_SESSION)) $_SESSION['gmaps_posCache'] = array();
-   // mail('tom.kay@utopiasystems.co.uk','Map Cache',"Requesting $address");
-    if (array_key_exists($address,$_SESSION['gmaps_posCache'])) return $_SESSION['gmaps_posCache'][$address];
-    return false;
+    $res = sql_query("SELECT * FROM tabledef_GeoCache WHERE `request` = '".mysql_real_escape_string($address)."' AND SUBDATE(NOW(), INTERVAL 3 DAY) < `update`");
+    if (!mysql_num_rows($res)) return FALSE;
+    $row = mysql_fetch_assoc($res);
+    return json_decode($row['response']);
+//    if (!array_key_exists('gmaps_posCache',$_SESSION)) $_SESSION['gmaps_posCache'] = array();
+//    mail('tom.kay@utopiasystems.co.uk','Map Cache',"Requesting $address");
+//    if (array_key_exists($address,$_SESSION['gmaps_posCache'])) return $_SESSION['gmaps_posCache'][$address];
+//    return false;
   }
 
 	public static function GetPos($address,$region=NULL,$firstOnly = true,$dropPostCode=true) {
