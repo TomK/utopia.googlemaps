@@ -129,9 +129,9 @@ FIN;
 		return $points.$fitScript;
 	}
 
-	public static function GetThreshold($points) {
-		if (!$points) return 10;
-		return self::CalculateDistance($points['southwest'],$points['northeast']);
+	public static function GetThreshold($points,$fallback = 50) {
+		if (!$points) return $fallback;
+		return max($fallback,self::CalculateDistance($points['southwest'],$points['northeast']));
 	}
 
   public static function CacheAddress($address,$pos) {
