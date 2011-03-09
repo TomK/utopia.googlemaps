@@ -19,7 +19,12 @@ class GoogleMaps {
 	private static function DrawScript() {
 		if (self::$scriptDrawn) return;
 		//<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
-		utopia::AddJSFile('http://maps.google.com/maps/api/js?sensor=false');
+		modOpts::AddOption('uJavascript','gmaps_version','Google Maps','',itTEXT);
+		$gmapsVer = modOpts::GetOption('uJavascript','gmaps_version');
+		if ($gmapsVer !== '0') {
+			$v = $gmapsVer === '' ? '' : 'v='.$gmapsVer.'&';
+			utopia::AddJSFile('http://maps.google.com/maps/api/js?'.$v.'sensor=false');
+		}
 		utopia::AddJSFile(utopia::GetRelativePath(dirname(__FILE__).'/gmaps.js'));
 		utopia::AppendVar('script_include','{gmapInit}');
 		self::$scriptDrawn = true;
