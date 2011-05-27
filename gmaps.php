@@ -142,15 +142,15 @@ FIN;
 		if (!$address || !$pos) return FALSE;
 		$cache = self::GetCachedAddress($address,0);
 		if (!$cache)
-			$res = sql_query("INSERT INTO tabledef_GeoCache (request,response) VALUES ('".mysql_real_escape_string($address)."','".mysql_real_escape_string(json_encode($pos))."')");
+			$res = sql_query("INSERT INTO tabledef_GeoCache (`request`,`response`) VALUES ('".mysql_real_escape_string($address)."','".mysql_real_escape_string(json_encode($pos))."')");
 		else
-			$res = sql_query("UPDATE tabledef_GeoCache SET response = '".mysql_real_escape_string(json_encode($pos))."' WHERE request = '".mysql_real_escape_string($address)."'");
+			$res = sql_query("UPDATE tabledef_GeoCache SET `response` = '".mysql_real_escape_string(json_encode($pos))."' WHERE `request` LIKE '".mysql_real_escape_string($address)."'");
 
 		return TRUE;
 	}
 	public static function GetCachedAddress($address,$expires=3) {
 		$expires = $expires && is_numeric($expires) ? ' AND SUBDATE(NOW(), INTERVAL '.$expires.' DAY) < `update`' : '';
-		$res = sql_query("SELECT * FROM tabledef_GeoCache WHERE `request` = '".mysql_real_escape_string($address)."'".$expires);
+		$res = sql_query("SELECT * FROM tabledef_GeoCache WHERE `request` LIKE '".mysql_real_escape_string($address)."'".$expires);
 		if (!$res || !mysql_num_rows($res)) return FALSE;
 		$row = mysql_fetch_assoc($res);
 		return json_decode($row['response'],true);
