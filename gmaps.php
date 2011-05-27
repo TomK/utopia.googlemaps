@@ -156,11 +156,7 @@ FIN;
 		if (is_array($address)) return $address;
 		$address = trim($address);
 		if ($region === TRUE) {
-			if (!isset($_SESSION['geoip'])) {
-				$_SESSION['geoip'] = file_get_contents('http://geoip.wtanaka.com/cc/'.$_SERVER['REMOTE_ADDR']);
-				//DebugMail('Find Region',$_SESSION['geoip'] ? $_SESSION['geoip'] : 'Not Found');
-			}
-			$region = $_SESSION['geoip'];
+			$region = self::GeoIP($_SERVER['REMOTE_ADDR']);
 		}
 		if (empty($address) && !empty($region)) $address = $region;
 		if (empty($address)) return NULL;
@@ -270,6 +266,17 @@ FIN;
 
 	public static function NewPoint($pos,$icon=NULL) {
 		return array('pos'=>$pos,'icon'=>$icon);
+	}
+
+	public static function GeoIP($ip) {
+		$cached = self::GetCachedAddress($ip);
+		if ($cached !== FALSE) return $cached;
+
+		$region = file_get_contents('http://geoip.wtanaka.com/cc/'.$ip);
+		//DebugMail('GeoIP Lookup',$region ? $region : 'Not Found');
+
+		self::CacheAddress($ip,$region);
+		return $region;
 	}
 }
 ?>
