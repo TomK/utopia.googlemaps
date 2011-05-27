@@ -125,11 +125,7 @@ FIN;
 		}
 		$points = "\n".implode("\n",$newpoints);
 		$fitScript = $fitBounds ? 'FitMapToMarkers("'.$id.'");'."\n" : '';
-		//utopia::AppendVar('script_include','
-    //    $(document).ready(function () {
-		//	'.$points.$fitScript.'
-    //    });');
-    self::$initScripts[$id] .= $points.$fitScript;
+		self::$initScripts[$id] .= $points.$fitScript;
 		return $points.$fitScript;
 	}
 
@@ -156,134 +152,101 @@ FIN;
 		return json_decode($row['response'],true);
 	}
 
-	public static function GetPos($address,$region='',$firstOnly = true,$dropPostCode=true) {
-		//$posCache =& $_SESSION['gmaps_posCache'];
-		//if (!$posCache) $posCache = array();
-		//if (array_key_exists($address.$region,$posCache)) return $posCache[$address.$region];
-		if (empty($address)) return NULL;
+	public static function GetPos($address,$region=true,$firstOnly = true,$dropPostCode=true) {
 		if (is_array($address)) return $address;
-		$cached = self::GetCachedAddress($address.$region); if ($cached) return $cached;
-//die($address);
+		$address = trim($address);
+		if ($region === TRUE) {
+			if (!isset($_SESSION['geoip'])) {
+				$_SESSION['geoip'] = file_get_contents('http://geoip.wtanaka.com/cc/'.$_SERVER['REMOTE_ADDR']);
+				//DebugMail('Find Region',$_SESSION['geoip'] ? $_SESSION['geoip'] : 'Not Found');
+			}
+			$region = $_SESSION['geoip'];
+		}
+		if (empty($address) && !empty($region)) $address = $region;
+		if (empty($address)) return NULL;
+		if ($region == $address) $region = '';
+		if (!is_string($region)) $region = '';
 
+		$cached = self::GetCachedAddress($address.$region,0); if ($cached !== FALSE) return $cached;
+		
 		timer_start('GMaps Lookup: '.$address);
 		// trim letters from end of postcode
-//		$newPostCode = $dropPostCode ? '$1' : '$1 $2';
-//    $address = preg_replace('/([a-z]{1,2}[0-9]{1,2})[ ]?([0-9]{1})([a-z]{2})/i', $newPostCode, $address);
-//    if ($dropPostCode) {
-//      $address = preg_replace('/([a-z]{1,2}[0-9]{1,2})[ ]?(([0-9]{1})([a-z]{2})?)?/i', '', $address);
-//    }
 
-		$address = urlencode($address);
-
-    $r = $region ? '&region='.$region : ''; 
-		//$out = file_get_contents('http://maps.google.com/maps/geo?q='.$address.'&oe=utf8&output=json&sensor=false&gl=uk&key='.GOOGLE_MAPS_API_KEY); // no key used here, it seems to remove all detail// Retrieve the URL contents
-	//	$out = file_get_contents('http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='.$address.$r); // no key used here, it seems to remove all detail// Retrieve the URL contents
+		$r = $region ? '&region='.$region : ''; 
 
 		$ch1 = curl_init();
-    curl_setopt($ch1, CURLOPT_URL, 'http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='.$address.$r);
-    curl_setopt($ch1, CURLOPT_HEADER, 0);
-    curl_setopt($ch1, CURLOPT_RETURNTRANSFER, 1);
-    $mh = curl_multi_init();
-    curl_multi_add_handle($mh,$ch1);
-	
-    do {
-        $mrc = curl_multi_exec($mh, $active);
-    } while ($mrc == CURLM_CALL_MULTI_PERFORM);
-    
-    while ($active && $mrc == CURLM_OK) {
-        if (curl_multi_select($mh) != -1) {
-            do {
-                $mrc = curl_multi_exec($mh, $active);
-            } while ($mrc == CURLM_CALL_MULTI_PERFORM);
-        }
-    }
+		curl_setopt($ch1, CURLOPT_URL, 'http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='.urlencode($address).$r);
+		curl_setopt($ch1, CURLOPT_HEADER, 0);
+		curl_setopt($ch1, CURLOPT_RETURNTRANSFER, 1);
+		$mh = curl_multi_init();
+		curl_multi_add_handle($mh,$ch1);
 
-    $out = curl_multi_getcontent($ch1);
+		do {
+			$mrc = curl_multi_exec($mh, $active);
+		} while ($mrc == CURLM_CALL_MULTI_PERFORM);
+
+		while ($active && $mrc == CURLM_OK) {
+			if (curl_multi_select($mh) != -1) {
+				do {
+					$mrc = curl_multi_exec($mh, $active);
+				} while ($mrc == CURLM_CALL_MULTI_PERFORM);
+			}
+		}
+
+		$out = curl_multi_getcontent($ch1);
     
-    curl_multi_remove_handle($mh, $ch1);
-    curl_multi_close($mh);
-    curl_close($ch1);
+		curl_multi_remove_handle($mh, $ch1);
+		curl_multi_close($mh);
+		curl_close($ch1);
 
 		$arr = json_decode($out,true);
- //   print_r($arr);
-//DebugMail('gmaps',$arr);
-		if (!$arr || $arr['status'] !== 'OK') return NULL;
-		
-		$ret = array();
-		foreach ($arr['results'] as $k => $row) {
-			//if (!array_key_exists('bounds',$row['geometry'])) continue;
-			$ret[] = array(
-					$row['geometry']['location']['lat'],
-					$row['geometry']['location']['lng'],
-					array_key_exists('bounds',$row['geometry']) ? $row['geometry']['bounds'] : NULL,
-					$row['formatted_address'],
-					$row
-				);
+		if (!$arr) return NULL;
+
+		switch ($arr['status']) {
+			case 'OK': break;
+			case 'ZERO_RESULTS':
+				self::CacheAddress($address.$region,'');
+				return FALSE;
+			default:
+				DebugMail('GMaps request not OK',$address."\n\n".print_r($arr,true));
+				return NULL;
+				break;
 		}
-    if (!$ret) return NULL;
 		
-    $first = reset($ret);
-    
-    self::CacheAddress($address.$region,$first);
-    self::CacheAddress($first[3].$region,$first);
-    //$posCache[$first[3].$region] = $first;
-    return $first;
-    
-		if ($firstOnly && count($ret)>0) return $first;
-		$posCache[$address.$region] = $ret;
-		timer_end('GMaps Lookup: '.$address);
+		$row = reset($arr['results']);
+		if (!$row) return NULL;
+
+		// locality, administrative_area_level_2, administrative_area_level_1
+		$newFormattedAddress = array();
+		if ($row && isset($row['address_components'])) {
+			foreach($row['address_components'] as $c) {
+				if (/*!isset($newFormattedAddress[0]) &&*/ array_search('locality',$c['types']) !== FALSE)
+					$newFormattedAddress[0] = $c['long_name'];
+                                if (/*!isset($newFormattedAddress[1]) &&*/ array_search('administrative_area_level_2',$c['types']) !== FALSE)
+                                        $newFormattedAddress[1] = $c['long_name'];
+                                if (/*!isset($newFormattedAddress[2]) &&*/ array_search('administrative_area_level_1',$c['types']) !== FALSE)
+                                        $newFormattedAddress[2] = $c['long_name'];
+			}
+		}
+		if (count($newFormattedAddress) >= 2) $row['formatted_address'] = implode(', ',$newFormattedAddress);
+
+		$ret = array(
+			$row['geometry']['location']['lat'],
+			$row['geometry']['location']['lng'],
+			isset($row['geometry']['bounds']) ? $row['geometry']['bounds'] : $row['geometry']['viewport'],
+			$row['formatted_address'],
+			$row
+		);
+
+		self::CacheAddress($address.$region,$ret);
+		self::CacheAddress($ret[3].$region,$ret);
 		return $ret;
-
-		//echo 'http://maps.google.com/maps/geo?q='.$address.'&oe=utf8&output=json&sensor=false&gl=uk&key='.GOOGLE_MAPS_API_KEY;
-		//print_r($arr); die();
-		// Parse the returned XML file
-		//echo $out;
-
-		//$out=htmlentities($out, ENT_QUOTES);
-		//$out=html_entity_decode($out, ENT_QUOTES , "utf-8");
-
-		if ($arr['Status']['code'] != '200') return NULL;
-
-		$widest = NULL;
-		foreach ($arr['Placemark'] as $place) {
-			if ($widest == NULL || ($place['AddressDetails']['Accuracy'] > $widest['AddressDetails']['Accuracy'])) {
-				$widest = $place;
-			}
-		}
-
-		$pos = array();
-		if (array_key_exists('AdministrativeArea',$widest['AddressDetails']['Country'])) {
-			if (array_key_exists('SubAdministrativeArea',$widest['AddressDetails']['Country']['AdministrativeArea'])) {
-				if (array_key_exists('Locality',$widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea'])) {
-					$pos[] = array_key_exists('PostalCode',$widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']) ? $widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']['PostalCode']['PostalCodeNumber'] : NULL;
-					$pos[] = array_key_exists('Thoroughfare',$widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']) ? $widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']['Thoroughfare']['ThoroughfareName'] : NULL;
-					$pos[] = array_key_exists('AddressLine',$widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']) ? $widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']['AddressLine'][0] : $widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['Locality']['LocalityName'];
-				}
-				$pos[] = $widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['SubAdministrativeAreaName'] ? $widest['AddressDetails']['Country']['AdministrativeArea']['SubAdministrativeArea']['SubAdministrativeAreaName'] : NULL;
-			}
-			$pos[] = $widest['AddressDetails']['Country']['AdministrativeArea']['AdministrativeAreaName'];
-		}
-		$pos[] = $widest['AddressDetails']['Country']['CountryName'];
-		$pos = array_unique($pos);
-
-		foreach ($pos as $k=>$v) if (!$v) unset($pos[$k]);
-		$wAddy = implode(', ',$pos);
-
-		$coords = $widest['Point']['coordinates'];
-		//$coords = split(',',$coords);
-		//print_r($coords);
-
-		if (stristr($wAddy,'Limburg')!= FALSE) {
-			print_r(debug_backtrace()); die();
-		}
-
-		return array($coords[1],$coords[0],$widest['AddressDetails']['Accuracy'],$wAddy,$arr);
 	}
 
 	public static function CalculateDistance($cPos,$sPos,$unit = 'M') {
+		if (!$cPos || !$sPos) return NULL;
 		if (is_string($cPos)) $cPos = GoogleMaps::GetPos($cPos);
 		if (is_string($sPos)) $sPos = GoogleMaps::GetPos($sPos);
-		if (!$cPos || !$sPos) return NULL;
 		list($lat1,$lon1) = array_values($cPos);
 		list($lat2,$lon2) = array_values($sPos);
 
