@@ -140,7 +140,7 @@ FIN;
 		if (!$cache)
 			$res = sql_query("INSERT INTO tabledef_GeoCache (`request`,`response`) VALUES ('".mysql_real_escape_string($address)."','".mysql_real_escape_string(json_encode($pos))."')");
 		else
-			$res = sql_query("UPDATE tabledef_GeoCache SET `response` = '".mysql_real_escape_string(json_encode($pos))."' WHERE `request` LIKE '".mysql_real_escape_string($address)."'");
+			$res = sql_query("UPDATE tabledef_GeoCache SET `response` = '".mysql_real_escape_string(json_encode($pos))."', `update` = CURRENT_TIMESTAMP WHERE `request` LIKE '".mysql_real_escape_string($address)."'");
 
 		return TRUE;
 	}
