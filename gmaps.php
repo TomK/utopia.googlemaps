@@ -6,10 +6,11 @@ class tabledef_GeoCache extends uTableDef {
                 $this->AddField('update',ftTIMESTAMP);
 		$this->SetFieldProperty('update','extra','ON UPDATE CURRENT_TIMESTAMP');
                 $this->SetFieldProperty('update','default','current_timestamp');
-		$this->AddField('request',ftLONGTEXT);
+		$this->AddField('request',ftVARCHAR,100);
                 $this->AddField('response',ftLONGTEXT);
 
                 $this->SetPrimaryKey('geocache_id');
+		$this->SetIndexField('request');
         }
 }
 
