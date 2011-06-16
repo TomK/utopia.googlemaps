@@ -170,30 +170,7 @@ FIN;
 
 		$r = $region ? '&region='.$region : ''; 
 
-		$ch1 = curl_init();
-		curl_setopt($ch1, CURLOPT_URL, 'http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='.urlencode($address).$r);
-		curl_setopt($ch1, CURLOPT_HEADER, 0);
-		curl_setopt($ch1, CURLOPT_RETURNTRANSFER, 1);
-		$mh = curl_multi_init();
-		curl_multi_add_handle($mh,$ch1);
-
-		do {
-			$mrc = curl_multi_exec($mh, $active);
-		} while ($mrc == CURLM_CALL_MULTI_PERFORM);
-
-		while ($active && $mrc == CURLM_OK) {
-			if (curl_multi_select($mh) != -1) {
-				do {
-					$mrc = curl_multi_exec($mh, $active);
-				} while ($mrc == CURLM_CALL_MULTI_PERFORM);
-			}
-		}
-
-		$out = curl_multi_getcontent($ch1);
-    
-		curl_multi_remove_handle($mh, $ch1);
-		curl_multi_close($mh);
-		curl_close($ch1);
+		$out = curl_get_contents('http://maps.googleapis.com/maps/api/geocode/json?sensor=false&address='.urlencode($address).$r);
 
 		$arr = json_decode($out,true);
 		if (!$arr) return NULL;
@@ -272,7 +249,7 @@ FIN;
 		$cached = self::GetCachedAddress($ip);
 		if ($cached !== FALSE) return $cached;
 
-		$region = file_get_contents('http://geoip.wtanaka.com/cc/'.$ip);
+		$region = curl_get_contents('http://geoip.wtanaka.com/cc/'.$ip);
 		//DebugMail('GeoIP Lookup',$region ? $region : 'Not Found');
 
 		self::CacheAddress($ip,$region);
